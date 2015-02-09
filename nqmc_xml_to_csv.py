@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 
-
+import argparse
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -26,47 +26,37 @@ def strip_stuff(html):
     return re.sub('[\t\n\r]', ' ', s.unescape(s.get_data()))
 
 
-def parse_rec(filename):
-    measure_id = filename[:filename.find("xml") - 1]
-    summary = ""
-    numerator = ""
-    denominator = ""
-    source_ids = list()
-    evidence_ids = list()
+def parse_rec(dir, filename):
+    measure_id = filename[:filename.find('xml') - 1]
+    summary = ''
+    numerator = ''
+    denominator = ''
 
-    tree = ET.parse("cardio/" + filename)
+    tree = ET.parse(os.path.join(dir, filename))
     root = tree.getroot()
 
     for child in root.iter():
-        if child.get("Name") == "Brief Abstract":
+        if child.get('Name') == 'Brief Abstract':
             for rec in child:
-                if rec.get("Name") in ["Description", "Rationale"]:
-                    summary += strip_stuff(rec[0].get("Value"))
-        elif child.get("Name") == "Denominator Description":
-            denominator = strip_stuff(child[0].get("Value"))
-        elif child.get("Name") == "Numerator Description":
-            numerator = strip_stuff(child[0].get("Value"))
-        elif child.get("Type") == ("citation" and "source"
-                                   in child.get("Name").lower()):
-            for rec in child:
-                if "list_uids" in rec.get("Value"):
-                    m = re.search(r"list_uids=(\d+)\"", rec.get("Value"))
-                    source_ids.append(m.group(1))
-        elif child.get("Type") == ("citation" and "evidence"
-                                   in child.get("Name").lower()):
-            for rec in child:
-                if "list_uids" in rec.get("Value"):
-                    m = re.search(r"list_uids=(\d+)\"", rec.get("Value"))
-                    evidence_ids.append(m.group(1))
-    return measure_id, summary, numerator,\
-        denominator, source_ids, evidence_ids
+                if rec.get('Name') in ['Description', 'Rationale']:
+                    summary += strip_stuff(rec[0].get('Value'))
+        elif child.get('Name') == 'Denominator Description':
+            denominator = strip_stuff(child[0].get('Value'))
+        elif child.get('Name') == 'Numerator Description':
+            numerator = strip_stuff(child[0].get('Value'))
+    return measure_id, summary, numerator, denominator
 
 
-with open("cardio_measures.csv", "w") as ofile:
-    for i, filename in enumerate(os.listdir(os.getcwd() + "/cardio/")):
-        print(i, filename)
-        m, s, n, d, si, ei = parse_rec(filename)
-        st = "0" if not si else ",".join(si)
-        et = "0" if not ei else ",".join(ei)
-        ofile.write(m + "\t" + s + "\t" + n + "\t" + d +
-                    "\t" + st + "\t" + et + "\n")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description = 'dump abstracts from measure xmls')
+    parser.add_argument('source_dir', help='The directory containing the xml files')
+    parser.add_argument('out_file', help='The output filename')
+
+    args = parser.parse_args()
+
+    with open(args.out_file, 'w') as ofile:
+        for i, filename in enumerate(os.listdir(args.source_dir)):
+            print('\r{} {}'.format(i, filename), end='\r')
+            m, s, n, d = parse_rec(args.source_dir, filename)
+            ofile.write(m + '\t' + s + ' ' + n + ' ' + d + '\n')
+        print('\n')
